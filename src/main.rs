@@ -10,6 +10,7 @@ mod value;
 mod vm;
 mod compile;
 mod scanner;
+mod object;
 
 const INPUT: &str = "Script";
 
