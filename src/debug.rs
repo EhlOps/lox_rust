@@ -19,7 +19,6 @@ pub fn dissassemble_chunk(chunk: &Chunk, heap: &mut Heap, name: &str) {
 
 pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> usize {
     print!("{:04} ", offset);
-
     let (instruction, line) = chunk.code.get(offset).unwrap();
     match instruction {
         Constant(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_CONSTANT", const_idx),
@@ -35,6 +34,7 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Divide => simple_instruction(chunk, offset, line, "OP_DIVIDE"),
         Not => simple_instruction(chunk, offset, line, "OP_NOT"),
         Negate => simple_instruction(chunk, offset, line, "OP_NEGATE"),
+        Print => simple_instruction(chunk, offset, line, "OP_PRINT"),
         Return => simple_instruction(chunk, offset, line, "OP_RETURN"),
     }
 }

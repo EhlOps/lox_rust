@@ -15,6 +15,7 @@ pub enum Op {
     Divide,
     Not,
     Negate,
+    Print,
     Return,
 }
 

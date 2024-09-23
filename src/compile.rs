@@ -82,9 +82,10 @@ impl Parser {
     pub fn compile(&mut self, source: String, chunk: &mut Chunk, heap: &mut Heap) -> bool {
         let mut scanner = scanner::Scanner::new();
         self.advance(&source, &mut scanner);
-        self.expression(&source, chunk, &mut scanner, heap);
-        self.consume(&source, TokenType::EOF, "Expect end of expression.", &mut scanner);
-        self.emit_byte(chunk, (Op::Return, line(self.previous.line)));
+        
+        while !self.match_token(TokenType::EOF, &source, &mut scanner) {
+            self.declaration(&source, chunk, &mut scanner, heap);
+        }
 
         !self.had_error
     }
@@ -136,6 +137,10 @@ impl Parser {
         self.error_at_current(message);
     }
 
+    pub fn declaration(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        self.statement(source, chunk, scanner, heap);
+    }
+
     pub fn emit_byte(&mut self, chunk: &mut Chunk, (op, line): (Op, Line)) {
         chunk.code.push((op, line));
     }
@@ -158,6 +163,26 @@ impl Parser {
                 self.error_at_previous("Too many constants in one chunk.");
             }
             self.emit_byte(chunk, (Op::Constant(constant), line));
+        }
+    }
+
+    pub fn match_token(&mut self, token_type: TokenType, source: &String, scanner: &mut scanner::Scanner, ) -> bool {
+        if self.current.token_type != token_type {
+            return false;
+        }
+        self.advance(source, scanner);
+        true
+    }
+
+    pub fn print_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        self.expression(source, chunk, scanner, heap);
+        self.consume(source, TokenType::Semicolon, "Expect ';' after value.", scanner);
+        self.emit_byte(chunk, (Op::Print, line(self.previous.line)));
+    }
+
+    pub fn statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        if self.match_token(TokenType::Print, source, scanner) {
+            self.print_statement(source, chunk, scanner, heap);
         }
     }
 

@@ -36,6 +36,10 @@ impl Heap {
         }
     }
 
+    pub fn get_all(&self) -> &HashMap<usize, HeapVal> {
+        &self.values
+    }
+
     pub fn mark(&mut self, id: usize) {
         if let Some(val) = self.values.get_mut(&id) {
             val.marked = true;
@@ -43,6 +47,7 @@ impl Heap {
     }
 }
 
+#[derive(Debug)]
 pub struct HeapVal {
     marked: bool,
     data: HeapData
@@ -61,6 +66,7 @@ impl HeapVal {
     }
 }
 
+#[derive(Debug)]
 pub enum HeapData {
     String(String)
 }

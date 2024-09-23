@@ -1,6 +1,12 @@
 extern crate clap;
 
 use clap::{Arg, Command};
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::{enable_raw_mode, disable_raw_mode},
+    ExecutableCommand,
+};
+use std::io::{self, Write};
 
 use std::fs;
 
@@ -66,10 +72,95 @@ fn read_file(file: String) -> String {
 }
 
 fn repl(vm: &mut vm::VM) {
+    let mut input_history: Vec<String> = Vec::new();
+    let mut current_input: String = String::new();
+    let mut history_index: Option<usize> = None;
+
+    enable_raw_mode().unwrap();
+    let mut stdout = io::stdout();
+    stdout.execute(crossterm::terminal::Clear(crossterm::terminal::ClearType::All)).unwrap();
+
+    print!("Welcome to Lox!\r\n");
+    print!("Type `exit` to exit the console.\r\n");
+    print!("> ");
+
     loop {
-        vm.init_vm();
-        let mut input = String::with_capacity(1024);
-        std::io::stdin().read_line(&mut input).unwrap();
-        vm.interpret(input);
+        io::stdout().flush().unwrap();        
+        if event::poll(std::time::Duration::from_millis(100)).unwrap() {
+            if let Event::Key(key_event) = event::read().unwrap() {
+                match key_event.code {
+                    KeyCode::Char(c) => {
+                        current_input.push(c);
+                        print!("{}", c);
+                        io::stdout().flush().unwrap();
+                    },
+                    KeyCode::Enter => {
+                        if !current_input.is_empty() {
+                            if current_input == "exit" {
+                                break;
+                            }
+                            print!("\r\n");
+                            input_history.push(current_input.clone());
+                            vm.init_vm();
+                            vm.interpret(current_input.clone());
+                            print!("\r\n");
+                            clear_line();
+                            print!("> ");
+                            current_input.clear();
+                            history_index = None;
+                        }
+                    },
+                    KeyCode::Backspace => {
+                        if !current_input.is_empty() {
+                            current_input.pop();
+                            print!("\r{}", clear_line());
+                            print!("> {}", current_input);
+                            io::stdout().flush().unwrap();
+                        }
+                    },
+                    KeyCode::Up => {
+                        if let Some(idx) = history_index {
+                            if idx > 0 {
+                                history_index = Some(idx - 1);
+                            }
+                        } else if !input_history.is_empty() {
+                            history_index = Some(input_history.len() - 1);
+                        }
+                        if let Some(idx) = history_index {
+                            current_input = input_history[idx].clone();
+                            print!("\r{}", clear_line());
+                            print!("> {}", current_input);
+                            io::stdout().flush().unwrap();
+                        }
+                    },
+                    KeyCode::Down => {
+                        if let Some(idx) = history_index {
+                            if idx < input_history.len() - 1 {
+                                history_index = Some(idx + 1);
+                            } else {
+                                history_index = None;
+                                current_input.clear();
+                                print!("\r{}", clear_line());
+                                print!("> {}", current_input);
+                            }
+                        }
+                        if let Some(idx) = history_index {
+                            current_input = input_history[idx].clone();
+                            print!("\r{}", clear_line());
+                            print!("> {}", current_input);
+                            io::stdout().flush().unwrap();
+                        }
+                    },
+                    _ => (),
+                }
+            }
+        }
     }
+    disable_raw_mode().unwrap();
+    println!();
+    println!("Goodbye!");
+}
+
+fn clear_line() -> &'static str {
+    "\x1b[2K\x1b[1G"
 }

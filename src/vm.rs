@@ -29,7 +29,7 @@ pub struct VM {
 }
 
 const STACK_MAX: usize = 256;
-const DEBUG_TRACE_EXECUTION: bool = true;
+const DEBUG_TRACE_EXECUTION: bool = false;
 
 macro_rules! binary_op {
     ($vm:expr, $valType:path, $op:tt) => {
@@ -129,10 +129,10 @@ impl VM {
         if !parser.compile(source, &mut chunk, &mut heap) {
             return InterpretResult::CompileError;
         }
-
         self.chunk = chunk;
         self.heap = heap;
-        self.run()
+        let result = self.run();
+        result
     }
 
     fn read_byte(&mut self) -> Op {
@@ -277,11 +277,12 @@ impl VM {
                         return InterpretResult::RuntimeError;
                     }
                 },
-                Return => {
-                    println!("\n");
-                    print!("Value: ");
+                Print => {
                     print_value(&self.pop(), &self.heap);
                     println!();
+                    return InterpretResult::Ok;
+                }
+                Return => {
                     return InterpretResult::Ok;
                 },
             }
