@@ -99,6 +99,24 @@ fn repl(vm: &mut vm::VM) {
                             if current_input == "exit" {
                                 break;
                             }
+                            if current_input == "stack" {
+                                current_input.clear();
+                                unsafe {
+                                    vm::DEBUG_TRACE_EXECUTION = true;
+                                }
+                                print!("\r\nFurther commands will show the stack...\r\n\r\n");
+                                print!("> ");
+                                continue;
+                            }
+                            if current_input == "nostack" {
+                                current_input.clear();
+                                unsafe {
+                                    vm::DEBUG_TRACE_EXECUTION = false;
+                                }
+                                print!("\r\nFurther commands will not show the stack...\r\n\r\n");
+                                print!("> ");
+                                continue;
+                            }
                             print!("\r\n");
                             input_history.push(current_input.clone());
                             vm.init_vm();

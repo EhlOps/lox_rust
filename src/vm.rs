@@ -29,7 +29,7 @@ pub struct VM {
 }
 
 const STACK_MAX: usize = 256;
-const DEBUG_TRACE_EXECUTION: bool = false;
+pub static mut DEBUG_TRACE_EXECUTION: bool = false;
 
 macro_rules! binary_op {
     ($vm:expr, $valType:path, $op:tt) => {
@@ -290,23 +290,26 @@ impl VM {
     }
 
     fn debug_trace_stack(&self) {
-        if DEBUG_TRACE_EXECUTION {
-            print!("          ");
-            for value in self.stack.iter() {
-                if let Value::Obj(obj) = value {
-                    let obj = self.heap.get(obj).unwrap();
-                    print!("[ ");
-                    print!("Obj({:^10}) ", format!("\"{}\"", obj.as_string()));
-                    print!("]");
-                } else {
-                    print!("[ ");
-                    print!("{:^10?} ", value);
-                    print!("]");
-                }
+        unsafe {
+            if !DEBUG_TRACE_EXECUTION {
+                return;
             }
-            println!();
-            dissassemble_instruction(&self.chunk, &self.heap, self.ip);
         }
+        print!("          ");
+        for value in self.stack.iter() {
+            if let Value::Obj(obj) = value {
+                let obj = self.heap.get(obj).unwrap();
+                print!("[ ");
+                print!("Obj({:^10}) ", format!("\"{}\"", obj.as_string()));
+                print!("]");
+            } else {
+                print!("[ ");
+                print!("{:^10?} ", value);
+                print!("]");
+            }
+        }
+        print!("\r\n");
+        dissassemble_instruction(&self.chunk, &self.heap, self.ip);
     }
 }
 

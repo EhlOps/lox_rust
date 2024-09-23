@@ -34,7 +34,11 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Divide => simple_instruction(chunk, offset, line, "OP_DIVIDE"),
         Not => simple_instruction(chunk, offset, line, "OP_NOT"),
         Negate => simple_instruction(chunk, offset, line, "OP_NEGATE"),
-        Print => simple_instruction(chunk, offset, line, "OP_PRINT"),
+        Print => {
+            let size = simple_instruction(chunk, offset, line, "OP_PRINT");
+            print!("\r\n");
+            size
+        },
         Return => simple_instruction(chunk, offset, line, "OP_RETURN"),
     }
 }
@@ -45,7 +49,7 @@ fn simple_instruction(chunk: &Chunk, offset: usize, line: &Line, name: &str) -> 
     if previous_offset != offset && chunk.code.get(offset - 1).unwrap().1.value == line.value {
         line_no = "   |".to_string();
     }
-    print!(" {:4} {:<16}", line_no, name);
+    print!("\r {:4} {:<16}", line_no, name);
     for _ in 0..16 {
         print!(" ");
     }
@@ -58,7 +62,7 @@ fn constant_instruction(chunk: &Chunk, heap: &Heap, offset: usize, line: &Line, 
     if previous_offset != offset && chunk.code.get(offset - 1).unwrap().1.value == line.value {
         line_no = "   |".to_string();
     }
-    print!(" {:4} {:<16} {:4} '", line_no, name, const_idx);
+    print!("\r {:4} {:<16} {:4} '", line_no, name, const_idx);
     let val_len = print_value(chunk.constants.get(*const_idx).unwrap(), heap);
     print!("'");
     if val_len < 14 {
