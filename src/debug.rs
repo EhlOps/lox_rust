@@ -25,6 +25,9 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Op::Nil => simple_instruction(chunk, offset, line, "OP_NIL"),
         Op::True => simple_instruction(chunk, offset, line, "OP_TRUE"),
         Op::False => simple_instruction(chunk, offset, line, "OP_FALSE"),
+        Pop => simple_instruction(chunk, offset, line, "OP_POP"),
+        GetGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_GET_GLOBAL", const_idx),
+        DefineGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_DEFINE_GLOBAL", const_idx),
         Equal => simple_instruction(chunk, offset, line, "OP_EQUAL"),
         Greater => simple_instruction(chunk, offset, line, "OP_GREATER"),
         Less => simple_instruction(chunk, offset, line, "OP_LESS"),
@@ -65,7 +68,7 @@ fn constant_instruction(chunk: &Chunk, heap: &Heap, offset: usize, line: &Line, 
     print!("\r {:4} {:<16} {:4} '", line_no, name, const_idx);
     let val_len = print_value(chunk.constants.get(*const_idx).unwrap(), heap);
     print!("'");
-    if val_len < 14 {
+    if val_len < 8 {
         for _ in 0..(8 - val_len) {
             print!(" ");
         }

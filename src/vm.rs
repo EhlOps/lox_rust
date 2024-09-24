@@ -1,4 +1,5 @@
 use std::any::{type_name, Any};
+use std::collections::HashMap;
 
 use crate::chunk::{
     Chunk,
@@ -25,6 +26,7 @@ pub struct VM {
     pub chunk: Chunk,
     pub ip: usize,
     pub stack: Vec<Value>,
+    pub globals: HashMap<String, Value>,
     pub heap: Heap,
 }
 
@@ -53,6 +55,7 @@ impl VM {
             chunk: Chunk::new(),
             ip: 0,
             stack: Vec::with_capacity(STACK_MAX),
+            globals: HashMap::new(),
             heap: Heap::new(),
         }
     }
@@ -125,12 +128,15 @@ impl VM {
         let mut parser = Parser::new();
         
         let mut chunk: Chunk = Chunk::new();
-        let mut heap: Heap = Heap::new();
-        if !parser.compile(source, &mut chunk, &mut heap) {
+
+        if !parser.compile(source, &mut chunk, &mut self.heap) {
             return InterpretResult::CompileError;
         }
+
         self.chunk = chunk;
-        self.heap = heap;
+        self.ip = 0;
+        self.stack.clear();
+
         let result = self.run();
         result
     }
@@ -166,6 +172,49 @@ impl VM {
                 },
                 Op::False => {
                     self.stack.push(Bool(false));
+                },
+                Pop => {
+                    self.pop();
+                },
+                GetGlobal(const_idx) => {
+                    if let Obj(heap_id) = self.chunk.constants[const_idx].clone() {
+                        let obj = self.heap.get(&heap_id).unwrap();
+                        match obj {
+                            HeapData::String(string) => {
+                                match self.globals.get(string) {
+                                    Some(value) => {
+                                        self.push(value.clone());
+                                    },
+                                    None => {
+                                        self.runtime_error(format!("Undefined variable '{}'", string));
+                                        return InterpretResult::RuntimeError;
+                                    }
+                                }
+                            }
+                            _ => {
+                                self.runtime_error(format!("Expected string as global variable name"));
+                                return InterpretResult::RuntimeError;
+                            }
+                        }
+                    }
+                },
+                DefineGlobal(const_idx) => {
+                    let val = self.pop();
+                    if let Obj(heap_id) = self.chunk.constants[const_idx].clone() {
+                        let obj = self.heap.get(&heap_id).unwrap();
+                        match obj {
+                            HeapData::String(string) => {
+                                self.globals.insert(string.clone(), val);
+                            },
+                            _ => {
+                                self.runtime_error(format!("Expected string as global variable name"));
+                                return InterpretResult::RuntimeError;
+                            }
+                        }
+                    }
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
                 },
                 Equal => {
                     let b = self.pop();

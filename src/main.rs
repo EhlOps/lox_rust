@@ -72,6 +72,8 @@ fn read_file(file: String) -> String {
 }
 
 fn repl(vm: &mut vm::VM) {
+    vm.init_vm();
+
     let mut input_history: Vec<String> = Vec::new();
     let mut current_input: String = String::new();
     let mut history_index: Option<usize> = None;
@@ -119,7 +121,6 @@ fn repl(vm: &mut vm::VM) {
                             }
                             print!("\r\n");
                             input_history.push(current_input.clone());
-                            vm.init_vm();
                             vm.interpret(current_input.clone());
                             print!("\r\n");
                             clear_line();
