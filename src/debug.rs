@@ -28,6 +28,7 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Pop => simple_instruction(chunk, offset, line, "OP_POP"),
         GetGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_GET_GLOBAL", const_idx),
         DefineGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_DEFINE_GLOBAL", const_idx),
+        SetGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_SET_GLOBAL", const_idx),
         Equal => simple_instruction(chunk, offset, line, "OP_EQUAL"),
         Greater => simple_instruction(chunk, offset, line, "OP_GREATER"),
         Less => simple_instruction(chunk, offset, line, "OP_LESS"),

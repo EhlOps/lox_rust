@@ -9,6 +9,7 @@ pub enum Op {
     Pop,
     GetGlobal(usize),
     DefineGlobal(usize),
+    SetGlobal(usize),
     Equal,
     Greater,
     Less,

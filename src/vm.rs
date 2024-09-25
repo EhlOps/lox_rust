@@ -216,6 +216,29 @@ impl VM {
                         return InterpretResult::Ok;
                     }
                 },
+                SetGlobal(const_idx) => {
+                    let val = self.pop();
+                    if let Obj(heap_id) = self.chunk.constants[const_idx].clone() {
+                        let obj = self.heap.get(&heap_id).unwrap();
+                        match obj {
+                            HeapData::String(string) => {
+                                if self.globals.contains_key(string) {
+                                    self.globals.insert(string.clone(), val);
+                                } else {
+                                    self.runtime_error(format!("Undefined variable '{}'", string));
+                                    return InterpretResult::RuntimeError;
+                                }
+                            }
+                            _ => {
+                                self.runtime_error(format!("Expected string as global variable name"));
+                                return InterpretResult::RuntimeError;
+                            }
+                        }
+                    }
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
+                }
                 Equal => {
                     let b = self.pop();
                     let a = self.pop();

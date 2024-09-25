@@ -47,8 +47,8 @@ impl Precedence {
 
 #[derive(Clone)]
 pub struct ParseRule {
-    pub prefix: Option<fn(&mut Parser, &String, &mut Chunk, &mut scanner::Scanner, &mut Heap)>,
-    pub infix: Option<fn(&mut Parser, &String, &mut Chunk, &mut scanner::Scanner, &mut Heap)>,
+    pub prefix: Option<fn(&mut Parser, &String, &mut Chunk, &mut scanner::Scanner, &mut Heap, bool)>,
+    pub infix: Option<fn(&mut Parser, &String, &mut Chunk, &mut scanner::Scanner, &mut Heap, bool)>,
     pub precedence: Precedence,
 }
 
@@ -191,9 +191,14 @@ impl Parser {
         true
     }
 
-    pub fn named_variable(&mut self, source: &String, chunk: &mut Chunk, heap: &mut Heap) {
+    pub fn named_variable(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, can_assign: bool) {
         let global = self.identifier_constant(source, chunk, heap);
-        self.emit_byte(chunk, (Op::GetGlobal(global), line(self.previous.line)));
+        if can_assign && self.match_token(TokenType::Equal, source, scanner) {
+            self.expression(source, chunk, scanner, heap, can_assign);
+            self.emit_byte(chunk, (Op::SetGlobal(global), line(self.previous.line)));
+        } else {
+            self.emit_byte(chunk, (Op::GetGlobal(global), line(self.previous.line)));
+        }
     }
 
     pub fn parse_variable(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) -> usize {
@@ -202,7 +207,7 @@ impl Parser {
     }
 
     pub fn print_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
-        self.expression(source, chunk, scanner, heap);
+        self.expression(source, chunk, scanner, heap, false);
         self.consume(source, TokenType::Semicolon, "Expect ';' after value.", scanner);
         self.emit_byte(chunk, (Op::Print, line(self.previous.line)));
     }
@@ -211,9 +216,11 @@ impl Parser {
         if self.match_token(TokenType::Print, source, scanner) {
             self.print_statement(source, chunk, scanner, heap);
         } else {
-            self.expression(source, chunk, scanner, heap);
+            self.expression(source, chunk, scanner, heap, false);
             self.consume(source, TokenType::Semicolon, "Expect ';' after expression.", scanner);
-            self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+
+            // This might be used later.
+            // self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
         }
     }
 
@@ -239,7 +246,7 @@ impl Parser {
     pub fn var_declaration(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
         let global = self.parse_variable(source, chunk, scanner, heap);
         if self.match_token(TokenType::Equal, source, scanner) {
-            self.expression(source, chunk, scanner, heap);
+            self.expression(source, chunk, scanner, heap, false);
         } else {
             self.emit_byte(chunk, (Op::Nil, line(self.previous.line)));
         }
@@ -249,7 +256,7 @@ impl Parser {
 
     // PREFIXES AND INFIXES ----------------------------------------------------
 
-    pub fn literal(&mut self, _source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, _heap: &mut Heap) {
+    pub fn literal(&mut self, _source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, _heap: &mut Heap, _can_assign: bool) {
         match self.previous.token_type {
             TokenType::False => self.emit_byte(chunk, (Op::False, line(self.previous.line))),
             TokenType::Nil => self.emit_byte(chunk, (Op::Nil, line(self.previous.line))),
@@ -258,31 +265,31 @@ impl Parser {
         }
     }
 
-    pub fn string(&mut self, source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, heap: &mut Heap) {
+    pub fn string(&mut self, source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
         let string = source.chars().skip(self.previous.start + 1).take(self.previous.length - 2).collect::<String>();
         let heap_id = heap.allocate(HeapData::String(string));
         self.emit_constant(chunk, Obj(heap_id), line(self.previous.line));
     }
 
-    pub fn expression(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+    pub fn expression(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
         self.parse_precedence(source, chunk, Precedence::Assignment, scanner, heap);
     }
 
-    pub fn variable(&mut self, source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, heap: &mut Heap) {
-        self.named_variable(source, chunk, heap);
+    pub fn variable(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, can_assign: bool) {
+        self.named_variable(source, chunk, scanner, heap, can_assign);
     }
 
-    pub fn number(&mut self, source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, _heap: &mut Heap) {
+    pub fn number(&mut self, source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, _heap: &mut Heap, _can_assign: bool) {
         let val = source[self.previous.start..self.previous.start + self.previous.length].parse::<f64>().unwrap();
         self.emit_constant(chunk, Number(val), line(self.previous.line));
     }
 
-    pub fn grouping(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
-        self.expression(source, chunk, scanner, heap);
+    pub fn grouping(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
+        self.expression(source, chunk, scanner, heap, false);
         self.consume(source, TokenType::RightParen, "Expect ')' after expression.", scanner);
     }
 
-    pub fn unary(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+    pub fn unary(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
         let operator_type = self.previous.clone().token_type;
         self.parse_precedence(source, chunk,  Precedence::Unary, scanner, heap);
         match operator_type {
@@ -292,7 +299,7 @@ impl Parser {
         }
     }
 
-    pub fn binary(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+    pub fn binary(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
         let operator_type = self.previous.clone().token_type;
         let rule = self.get_rule(&operator_type);
         self.parse_precedence(source, chunk, rule.precedence.clone().increase(), scanner, heap);
@@ -528,15 +535,16 @@ impl Parser {
     pub fn parse_precedence(&mut self, source: &String, chunk: &mut Chunk, precedence: Precedence, scanner: &mut scanner::Scanner, heap: &mut Heap) {
         self.advance(source, scanner);
         let prefix_rule = self.get_rule(&self.previous.token_type).prefix;
+        let can_assign = precedence <= Precedence::Assignment;
         if let Some(prefix) = prefix_rule {
-            prefix(self, source, chunk, scanner, heap);
+            prefix(self, source, chunk, scanner, heap, can_assign);
         }
 
         while precedence <= self.get_rule(&self.current.token_type).precedence {
             self.advance(source, scanner);
             let infix_rule = self.get_rule(&self.previous.token_type).infix;
             if let Some(infix) = infix_rule {
-                infix(self, source, chunk, scanner, heap);
+                infix(self, source, chunk, scanner, heap, false);
             }
         }
     }
