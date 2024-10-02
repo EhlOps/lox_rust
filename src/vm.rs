@@ -78,6 +78,10 @@ impl VM {
         self.stack.pop().unwrap()
     }
 
+    pub fn peek(&self, distance: usize) -> Value {
+        self.stack[self.stack.len() - 1 - distance].clone()
+    }
+
     pub fn equal(&self, a: Value, b: Value) -> bool {
         if a.type_id() != b.type_id() {
             return false;
@@ -175,6 +179,14 @@ impl VM {
                 },
                 Pop => {
                     self.pop();
+                },
+                GetLocal(local_idx) => {
+                    let value = self.stack[local_idx].clone();
+                    self.push(value);
+                },
+                SetLocal(local_idx) => {
+                    let value = self.peek(0);
+                    self.stack[local_idx] = value;
                 },
                 GetGlobal(const_idx) => {
                     if let Obj(heap_id) = self.chunk.constants[const_idx].clone() {
@@ -352,11 +364,16 @@ impl VM {
                 Print => {
                     print_value(&self.pop(), &self.heap);
                     println!();
-                    return InterpretResult::Ok;
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
                 }
                 Return => {
                     return InterpretResult::Ok;
                 },
+            }
+            if self.ip >= self.chunk.code.len() {
+                return InterpretResult::Ok;
             }
         }
     }

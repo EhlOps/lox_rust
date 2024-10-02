@@ -1,1 +1,10 @@
-print 1 + 3 + 5;
+var i = 1;
+var j = 2;
+{
+    var hi = 1;
+    var not_hi = 2;
+    not_hi = not_hi + 1;
+    print not_hi;
+}
+print i;
+print j;

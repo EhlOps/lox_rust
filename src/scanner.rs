@@ -72,13 +72,13 @@ impl Scanner {
                 return self.number_token(source);
             },
             'a'..='z' | 'A'..='Z' => {
-                while self.peek(source).is_alphanumeric() {
+                while self.peek(source).is_alphanumeric() || ['_', '-'].contains(&self.peek(source)) {
                     self.advance(source);
                 }
 
                 return self.make_token(self.identifier_type(source));
             },
-            _ => ()
+            c => println!("\r\n{}", c)
         }
     
         self.error_token("Unexpected character.")

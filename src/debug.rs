@@ -26,6 +26,8 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Op::True => simple_instruction(chunk, offset, line, "OP_TRUE"),
         Op::False => simple_instruction(chunk, offset, line, "OP_FALSE"),
         Pop => simple_instruction(chunk, offset, line, "OP_POP"),
+        GetLocal(_) => byte_instruction(chunk, offset, line, "OP_GET_LOCAL"),
+        SetLocal(_) => byte_instruction(chunk, offset, line, "OP_SET_LOCAL"),
         GetGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_GET_GLOBAL", const_idx),
         DefineGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_DEFINE_GLOBAL", const_idx),
         SetGlobal(const_idx) => constant_instruction(chunk, heap, offset, line, "OP_SET_GLOBAL", const_idx),
@@ -75,6 +77,17 @@ fn constant_instruction(chunk: &Chunk, heap: &Heap, offset: usize, line: &Line, 
         }
     }
     offset + 1
+}
+
+fn byte_instruction(chunk: &Chunk, offset: usize, line: &Line, name: &str) -> usize {
+    let mut line_no = format!("{:04}", line.value);
+    let previous_offset = if offset == 0 { 0 } else { offset - 1 };
+    if previous_offset != offset && chunk.code.get(offset - 1).unwrap().1.value == line.value {
+        line_no = "   |".to_string();
+    }
+    let byte = chunk.code.get(offset + 1).unwrap();
+    print!("\r {:4} {:<16} {:4}", line_no, name, byte.0);
+    offset + 2
 }
 
 pub fn print_value(value: &Value, heap: &Heap) -> usize {

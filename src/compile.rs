@@ -45,6 +45,27 @@ impl Precedence {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Local {
+    token: Token,
+    depth: isize,
+}
+
+pub struct Compiler {
+    locals: Vec<Local>,
+    scope_depth: isize,
+}
+
+impl Compiler {
+    pub fn new() -> Compiler {
+        Compiler {
+            locals: Vec::new(),
+            scope_depth: 0,
+        }
+    }
+    
+}
+
 #[derive(Clone)]
 pub struct ParseRule {
     pub prefix: Option<fn(&mut Parser, &String, &mut Chunk, &mut scanner::Scanner, &mut Heap, bool)>,
@@ -57,6 +78,7 @@ pub struct Parser<> {
     previous: scanner::Token,
     had_error: bool,
     panic_mode: bool,
+    compiler: Compiler,
 }
 
 impl Parser {
@@ -76,6 +98,7 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
+            compiler: Compiler::new(),
         }
     }
 
@@ -128,6 +151,36 @@ impl Parser {
         self.had_error = true;
     }
 
+    pub fn add_local(&mut self, token: Token) {
+        self.compiler.locals.push(Local {
+            token: token,
+            depth: -1,
+        });
+    }
+
+    pub fn block(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        while !(self.current.token_type == TokenType::RightBrace) && !(self.current.token_type == TokenType::EOF) {
+            self.declaration(source, chunk, scanner, heap);
+        }
+
+        self.consume(source, TokenType::RightBrace, "Expect '}' after block.", scanner);
+    }
+
+    pub fn begin_scope(&mut self) {
+        self.compiler.scope_depth += 1;
+    }
+
+    pub fn end_scope(&mut self, chunk: &mut Chunk) {
+        self.compiler.scope_depth -= 1;
+
+        let locals_to_pop: usize = self.compiler.locals.iter().rev()
+            .take_while(|local| local.depth > self.compiler.scope_depth).collect::<Vec<_>>().len();
+
+        for _ in 0..locals_to_pop {
+            self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        }
+    }
+
     pub fn consume(&mut self, source: &String, token_type: TokenType, message: &str, scanner: &mut scanner::Scanner) {
         if self.current.token_type == token_type {
             self.advance(source, scanner);
@@ -149,7 +202,38 @@ impl Parser {
         }
     }
 
+    pub fn declare_variable(&mut self, source: &String) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+
+        let name = self.previous.clone();
+        let scope_depth = self.compiler.scope_depth;
+        let locals = self.compiler.locals.clone();
+
+        let is_same_token = |token1: &Token, token2: &Token| -> bool {
+            source.chars().skip(token1.start).take(token1.length).collect::<String>() == source.chars().skip(token2.start).take(token2.length).collect::<String>()
+        };
+
+        for local in locals.iter().rev() {
+            if local.depth != scope_depth {
+                break;
+            }
+
+            if is_same_token(&name, &local.token) {
+                self.error_at_current("Variable with this name already declared in this scope.");
+            }
+        }
+
+        self.add_local(name);
+    }
+
     pub fn define_variable(&mut self, chunk: &mut Chunk, global: usize) {
+        if self.compiler.scope_depth > 0 {
+            self.mark_initialized();
+            return;
+        }
+
         self.emit_byte(chunk, (Op::DefineGlobal(global), line(self.previous.line)));
     }
 
@@ -191,18 +275,40 @@ impl Parser {
         true
     }
 
+    pub fn mark_initialized(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+        self.compiler.locals.last_mut().unwrap().depth = self.compiler.scope_depth;
+    }
+
     pub fn named_variable(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, can_assign: bool) {
         let global = self.identifier_constant(source, chunk, heap);
+        let local = self.resolve_local(source);
         if can_assign && self.match_token(TokenType::Equal, source, scanner) {
             self.expression(source, chunk, scanner, heap, can_assign);
-            self.emit_byte(chunk, (Op::SetGlobal(global), line(self.previous.line)));
+            if local != -1 {
+                self.emit_byte(chunk, (Op::SetLocal(local as usize), line(self.previous.line)));
+            } else {
+                self.emit_byte(chunk, (Op::SetGlobal(global), line(self.previous.line)));
+            }
         } else {
-            self.emit_byte(chunk, (Op::GetGlobal(global), line(self.previous.line)));
+            if local != -1 {
+                self.emit_byte(chunk, (Op::GetLocal(local as usize), line(self.previous.line)));
+            } else {
+                self.emit_byte(chunk, (Op::GetGlobal(global), line(self.previous.line)));
+            }
         }
     }
 
     pub fn parse_variable(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) -> usize {
         self.consume(source, TokenType::Identifier, "Expect variable name.", scanner);
+
+        self.declare_variable(source);
+        if self.compiler.scope_depth > 0 {
+            return 0;
+        }
+
         self.identifier_constant(source, chunk, heap)
     }
 
@@ -212,9 +318,29 @@ impl Parser {
         self.emit_byte(chunk, (Op::Print, line(self.previous.line)));
     }
 
+    pub fn resolve_local(&mut self, source: &String) -> isize {
+        let name = source.chars().skip(self.previous.start).take(self.previous.length).collect::<String>();
+        let locals = self.compiler.locals.clone();
+        for (i, local) in locals.iter().enumerate().rev() {
+            let local_name = source.chars().skip(local.token.start).take(local.token.length).collect::<String>();
+
+            if name == local_name {
+                if local.depth == -1 {
+                    self.error_at_current("Cannot read local variable in its own initializer.");
+                }
+                return i as isize;
+            }
+        }
+        -1
+    }
+
     pub fn statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
         if self.match_token(TokenType::Print, source, scanner) {
             self.print_statement(source, chunk, scanner, heap);
+        } else if self.match_token(TokenType::LeftBrace, source, scanner) { 
+            self.begin_scope();
+            self.block(source, chunk, scanner, heap);
+            self.end_scope(chunk);
         } else {
             self.expression(source, chunk, scanner, heap, false);
             self.consume(source, TokenType::Semicolon, "Expect ';' after expression.", scanner);

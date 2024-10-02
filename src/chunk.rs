@@ -7,6 +7,8 @@ pub enum Op {
     True,
     False,
     Pop,
+    GetLocal(usize),
+    SetLocal(usize),
     GetGlobal(usize),
     DefineGlobal(usize),
     SetGlobal(usize),

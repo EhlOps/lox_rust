@@ -39,9 +39,19 @@ fn main() {
             .help("lox script to run")
             .required(false)
             .index(1))
+        .arg(Arg::new("debug")
+            .help("Prints debug information")
+            .short('d')
+            .long("debug")
+            .num_args(0))
         .get_matches();
 
     if let Some(input) = get_input(&arg_matches) {
+        if arg_matches.get_flag("debug") {
+            unsafe {
+                vm::DEBUG_TRACE_EXECUTION = true;
+            }
+        }
         run_file(&mut vm, input);
     } else {
         repl(&mut vm);
