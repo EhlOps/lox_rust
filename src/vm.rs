@@ -362,8 +362,10 @@ impl VM {
                     }
                 },
                 Print => {
-                    print_value(&self.pop(), &self.heap);
-                    println!();
+                    if unsafe{!DEBUG_TRACE_EXECUTION} {
+                        print_value(&self.pop(), &self.heap);
+                        println!();
+                    }
                     if self.ip >= self.chunk.code.len() {
                         return InterpretResult::Ok;
                     }

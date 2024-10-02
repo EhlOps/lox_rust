@@ -42,7 +42,6 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
         Negate => simple_instruction(chunk, offset, line, "OP_NEGATE"),
         Print => {
             let size = simple_instruction(chunk, offset, line, "OP_PRINT");
-            print!("\r\n");
             size
         },
         Return => simple_instruction(chunk, offset, line, "OP_RETURN"),
@@ -85,8 +84,8 @@ fn byte_instruction(chunk: &Chunk, offset: usize, line: &Line, name: &str) -> us
     if previous_offset != offset && chunk.code.get(offset - 1).unwrap().1.value == line.value {
         line_no = "   |".to_string();
     }
-    let byte = chunk.code.get(offset + 1).unwrap();
-    print!("\r {:4} {:<16} {:4}", line_no, name, byte.0);
+    let byte = chunk.code.get(offset).unwrap();
+    print!("\r {:4} {:<20} {:4}", line_no, name, byte.0);
     offset + 2
 }
 
