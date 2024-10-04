@@ -4,6 +4,7 @@ use clap::{Arg, Command};
 use crossterm::{
     event::{self, Event, KeyCode},
     terminal::{enable_raw_mode, disable_raw_mode},
+    cursor,
     ExecutableCommand,
 };
 use std::io::{self, Write};
@@ -178,6 +179,24 @@ fn repl(vm: &mut vm::VM) {
                             print!("\r{}", clear_line());
                             print!("> {}", current_input);
                             io::stdout().flush().unwrap();
+                        }
+                    },
+                    KeyCode::Left => {
+                        if let Ok(_) = stdout.execute(cursor::MoveLeft(1)) {
+                            io::stdout().flush().unwrap();
+                        } else {
+                            if let Ok(_) = stdout.execute(cursor::MoveToPreviousLine(1)) {
+                                io::stdout().flush().unwrap();
+                            }
+                        }
+                    },
+                    KeyCode::Right => {
+                        if let Ok(_) = stdout.execute(cursor::MoveRight(1)) {
+                            io::stdout().flush().unwrap();
+                        } else {
+                            if let Ok(_) = stdout.execute(cursor::MoveToNextLine(1)) {
+                                io::stdout().flush().unwrap();
+                            }
                         }
                     },
                     _ => (),

@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::os::macos::raw::stat;
 
 use crate::value::{
     Value,
@@ -262,9 +263,85 @@ impl Parser {
         }
     }
 
+    pub fn emit_jump(&mut self, chunk: &mut Chunk, op: Op) -> usize {
+        self.emit_byte(chunk, (op, line(self.previous.line)));
+        chunk.code.len() - 1
+    }
+
+    pub fn emit_loop(&mut self, chunk: &mut Chunk, loop_start: usize) {
+        let offset = chunk.code.len() - loop_start + 1;
+        self.emit_byte(chunk, (Op::Loop(offset), line(self.previous.line)));
+    }
+
+    pub fn for_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        self.begin_scope();
+        self.consume(source, TokenType::LeftParen, "Expect '(' after 'for'.", scanner);
+        if self.match_token(TokenType::Semicolon, source, scanner) {
+            // No initializer.
+        } else if self.match_token(TokenType::Var, source, scanner) {
+            self.var_declaration(source, chunk, scanner, heap);
+        } else {
+            self.expression(source, chunk, scanner, heap, false);
+            self.consume(source, TokenType::Semicolon, "Expect ';' after loop initializer.", scanner);
+        }
+
+        let mut loop_start = chunk.code.len();
+        let mut exit_jump = None;
+        if !self.match_token(TokenType::Semicolon, source, scanner) {
+            self.expression(source, chunk, scanner, heap, false);
+            self.consume(source, TokenType::Semicolon, "Expect ';' after loop condition.", scanner);
+
+            exit_jump = Some(self.emit_jump(chunk, Op::JumpIfFalse(0)));
+            self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        }
+
+        if !self.match_token(TokenType::RightParen, source, scanner) {
+            let body_jump = self.emit_jump(chunk, Op::Jump(0));
+            let increment_start = chunk.code.len();
+            self.expression(source, chunk, scanner, heap, false);
+            self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+            self.consume(source, TokenType::RightParen, "Expect ')' after for clauses.", scanner);
+            self.emit_loop(chunk, loop_start);
+            loop_start = increment_start;
+            self.patch_jump(chunk, body_jump);
+        }
+
+        self.statement(source, chunk, scanner, heap);
+        self.emit_loop(chunk, loop_start);
+
+        if let Some(exit_jump) = exit_jump {
+            self.patch_jump(chunk, exit_jump);
+            self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        }
+
+        self.end_scope(chunk);
+    }
+
     pub fn identifier_constant(&mut self, source: &String, chunk: &mut Chunk, heap: &mut Heap) -> usize {
         let identifier = source.chars().skip(self.previous.start).take(self.previous.length).collect::<String>();
         chunk.add_constant(Value::Obj(heap.allocate(HeapData::String(identifier))))
+    }
+
+    pub fn if_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        self.consume(source, TokenType::LeftParen, "Expect '(' after 'if'.", scanner);
+        self.expression(source, chunk, scanner, heap, false);
+        self.consume(source, TokenType::RightParen, "Expect ')' after condition.", scanner);
+
+        let then_jump = self.emit_jump(chunk, Op::JumpIfFalse(0));
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        
+        self.statement(source, chunk, scanner, heap);
+
+        let else_jump = self.emit_jump(chunk, Op::Jump(0));
+
+        self.patch_jump(chunk, then_jump);
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+
+        if(self.match_token(TokenType::Else, source, scanner)) {
+            self.statement(source, chunk, scanner, heap);
+        }
+
+        self.patch_jump(chunk, else_jump);
     }
 
     pub fn match_token(&mut self, token_type: TokenType, source: &String, scanner: &mut scanner::Scanner, ) -> bool {
@@ -312,6 +389,18 @@ impl Parser {
         self.identifier_constant(source, chunk, heap)
     }
 
+    pub fn patch_jump(&mut self, chunk: &mut Chunk, offset: usize) {
+        let jump = chunk.code.len() - offset - 1;
+        let (maybe_jump, lineno) = chunk.code.get_mut(offset).unwrap();
+        if let Op::JumpIfFalse(_) = maybe_jump {
+            chunk.code[offset] = (Op::JumpIfFalse(jump), lineno.clone());
+        } else if let Op::Jump(_) = maybe_jump {
+            chunk.code[offset] = (Op::Jump(jump), lineno.clone());
+        } else {
+            self.error_at_previous("Cannot jump here.");
+        }
+    }
+
     pub fn print_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
         self.expression(source, chunk, scanner, heap, false);
         self.consume(source, TokenType::Semicolon, "Expect ';' after value.", scanner);
@@ -337,6 +426,12 @@ impl Parser {
     pub fn statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
         if self.match_token(TokenType::Print, source, scanner) {
             self.print_statement(source, chunk, scanner, heap);
+        } else if self.match_token(TokenType::For, source, scanner) {
+            self.for_statement(source, chunk, scanner, heap);
+        } else if self.match_token(TokenType::If, source, scanner) {
+            self.if_statement(source, chunk, scanner, heap);
+        } else if self.match_token(TokenType::While, source, scanner) {
+            self.while_statement(source, chunk, scanner, heap);
         } else if self.match_token(TokenType::LeftBrace, source, scanner) { 
             self.begin_scope();
             self.block(source, chunk, scanner, heap);
@@ -380,6 +475,21 @@ impl Parser {
         self.define_variable(chunk, global);
     }
 
+    pub fn while_statement(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap) {
+        let loop_start = chunk.code.len();
+        self.consume(source, TokenType::LeftParen, "Expect '(' after 'while'.", scanner);
+        self.expression(source, chunk, scanner, heap, false);
+        self.consume(source, TokenType::RightParen, "Expect ')' after condition.", scanner);
+
+        let exit_jump = self.emit_jump(chunk, Op::JumpIfFalse(0));
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        self.statement(source, chunk, scanner, heap);
+        self.emit_loop(chunk, loop_start);
+
+        self.patch_jump(chunk, exit_jump);
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+    }
+
     // PREFIXES AND INFIXES ----------------------------------------------------
 
     pub fn literal(&mut self, _source: &String, chunk: &mut Chunk, _scanner: &mut scanner::Scanner, _heap: &mut Heap, _can_assign: bool) {
@@ -413,6 +523,22 @@ impl Parser {
     pub fn grouping(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
         self.expression(source, chunk, scanner, heap, false);
         self.consume(source, TokenType::RightParen, "Expect ')' after expression.", scanner);
+    }
+
+    pub fn and(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
+        let end_jump = self.emit_jump(chunk, Op::JumpIfFalse(0));
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        self.parse_precedence(source, chunk, Precedence::And, scanner, heap);
+        self.patch_jump(chunk, end_jump);
+    }
+
+    pub fn or(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
+        let else_jump = self.emit_jump(chunk, Op::JumpIfFalse(0));
+        let end_jump = self.emit_jump(chunk, Op::Jump(0));
+        self.patch_jump(chunk, else_jump);
+        self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
+        self.parse_precedence(source, chunk, Precedence::Or, scanner, heap);
+        self.patch_jump(chunk, end_jump);
     }
 
     pub fn unary(&mut self, source: &String, chunk: &mut Chunk, scanner: &mut scanner::Scanner, heap: &mut Heap, _can_assign: bool) {
@@ -567,8 +693,8 @@ impl Parser {
             },
             TokenType::And => ParseRule {
                 prefix: None,
-                infix: None,
-                precedence: Precedence::None,
+                infix: Some(Parser::and),
+                precedence: Precedence::And,
             },
             TokenType::Class => ParseRule {
                 prefix: None,
@@ -607,8 +733,8 @@ impl Parser {
             },
             TokenType::Or => ParseRule {
                 prefix: None,
-                infix: None,
-                precedence: Precedence::None,
+                infix: Some(Parser::or),
+                precedence: Precedence::Or,
             },
             TokenType::Print => ParseRule {
                 prefix: None,

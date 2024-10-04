@@ -22,6 +22,9 @@ pub enum Op {
     Not,
     Negate,
     Print,
+    JumpIfFalse(usize),
+    Jump(usize),
+    Loop(usize),
     Return,
 }
 

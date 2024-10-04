@@ -369,7 +369,28 @@ impl VM {
                     if self.ip >= self.chunk.code.len() {
                         return InterpretResult::Ok;
                     }
-                }
+                },
+                JumpIfFalse(offset) => {
+                    let val = self.peek(0);
+                    if val == Value::Nil || (val == Bool(false)) {
+                        self.ip += offset;
+                    }
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
+                },
+                Jump(offset) => {
+                    self.ip += offset;
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
+                },
+                Loop(offset) => {
+                    self.ip -= offset;
+                    if self.ip >= self.chunk.code.len() {
+                        return InterpretResult::Ok;
+                    }
+                },
                 Return => {
                     return InterpretResult::Ok;
                 },

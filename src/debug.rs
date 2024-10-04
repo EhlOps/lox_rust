@@ -44,6 +44,9 @@ pub fn dissassemble_instruction(chunk: &Chunk, heap: &Heap, offset: usize) -> us
             let size = simple_instruction(chunk, offset, line, "OP_PRINT");
             size
         },
+        JumpIfFalse(_) => jump_instruction(chunk, offset, line, "OP_JUMP_IF_FALSE", 1),
+        Jump(_) => jump_instruction(chunk, offset, line, "OP_JUMP", 1),
+        Loop(_) => jump_instruction(chunk, offset, line, "OP_LOOP", -1),
         Return => simple_instruction(chunk, offset, line, "OP_RETURN"),
     }
 }
@@ -89,25 +92,36 @@ fn byte_instruction(chunk: &Chunk, offset: usize, line: &Line, name: &str) -> us
     offset + 2
 }
 
+fn jump_instruction(chunk: &Chunk, offset: usize, line: &Line, name: &str, sign: i32) -> usize {
+    let jump = chunk.code.get(offset).unwrap();
+    let mut line_no = format!("{:04}", line.value);
+    let previous_offset = if offset == 0 { 0 } else { offset - 1 };
+    if previous_offset != offset && chunk.code.get(offset - 1).unwrap().1.value == line.value {
+        line_no = "   |".to_string();
+    }
+    print!("\r {:4} {:<16} {} -> {}", line_no, name, jump.0, offset as i32 + 2 + sign);
+    offset + 2
+}
+
 pub fn print_value(value: &Value, heap: &Heap) -> usize {
     match value {
         Value::Number(num) => {
             let val = format!("{}", num);
-            print!("{val}");
+            print!("\r{val}");
             return val.len();
         },
         Value::Nil => {
-            print!("nil");
+            print!("\rnil");
             return 3;
         },
         Value::Bool(b) => {
             let val = format!("{}", b);
-            print!("{val}");
+            print!("\r{val}");
             return val.len();
         },
         Value::Obj(val) => {
             let obj_string = heap.get(val).unwrap();
-            print!("{}", obj_string.as_string());
+            print!("\r{}", obj_string.as_string());
             return obj_string.as_string().len();
         },
     }
