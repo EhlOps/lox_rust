@@ -1,10 +1,12 @@
-var i = 1;
-var j = 2;
-{
-    var hi = 1;
-    var not_hi = 2;
-    not_hi = not_hi + 1;
-    print not_hi;
+var string_1 = "Hello";
+var string_2 = "World";
+
+for (var i = 0; i < 3; i = i + 1) {
+    if (i == 0) {
+        print string_1;
+    } else if (i == 2) {
+        print string_2;
+    } else {
+        print "";
+    }
 }
-print i;
-print j;

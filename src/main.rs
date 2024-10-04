@@ -63,7 +63,6 @@ fn main() {
 
 fn run_file(vm: &mut vm::VM, input: &String) {
     let source = read_file(input.to_string());
-    println!("{source}");
     let result: vm::InterpretResult  = vm.interpret(source);
     match result {
         vm::InterpretResult::Ok => (),
