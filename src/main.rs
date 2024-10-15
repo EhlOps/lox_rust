@@ -1,3 +1,4 @@
+// External Crates
 extern crate clap;
 
 use clap::{Arg, Command};
@@ -7,9 +8,13 @@ use crossterm::{
     cursor,
     ExecutableCommand,
 };
-use std::io::{self, Write};
 
+// Standard Package
+
+use std::io::{self, Write};
 use std::fs;
+
+// Internal Modules
 
 mod chunk;
 mod debug;

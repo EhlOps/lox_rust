@@ -116,6 +116,9 @@ impl VM {
                                     false
                                 }
                             }
+                            _ => {
+                                false
+                            }
                         }
                     } else {
                         false

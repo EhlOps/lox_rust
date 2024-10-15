@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::os::macos::raw::stat;
 
 use crate::value::{
     Value,
@@ -11,7 +10,7 @@ use crate::scanner::{
     TokenType,
 };
 use crate::chunk::{Chunk, Line, Op, line};
-use crate::object::{Heap, HeapData};
+use crate::object::{Heap, HeapData, ObjFunction};
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Precedence {
@@ -52,7 +51,14 @@ pub struct Local {
     depth: isize,
 }
 
+pub enum FunctionType {
+    Function,
+    Script,
+}
+
 pub struct Compiler {
+    function: ObjFunction,
+    function_type: FunctionType,
     locals: Vec<Local>,
     scope_depth: isize,
 }
@@ -60,6 +66,8 @@ pub struct Compiler {
 impl Compiler {
     pub fn new() -> Compiler {
         Compiler {
+            function: ObjFunction::new(),
+            function_type: FunctionType::Function,
             locals: Vec::new(),
             scope_depth: 0,
         }
@@ -106,6 +114,8 @@ impl Parser {
     pub fn compile(&mut self, source: String, chunk: &mut Chunk, heap: &mut Heap) -> bool {
         let mut scanner = scanner::Scanner::new();
         self.advance(&source, &mut scanner);
+
+        self.compiler.function.set_chunk(chunk.clone());
         
         while !self.match_token(TokenType::EOF, &source, &mut scanner) {
             self.declaration(&source, chunk, &mut scanner, heap);
@@ -337,7 +347,7 @@ impl Parser {
         self.patch_jump(chunk, then_jump);
         self.emit_byte(chunk, (Op::Pop, line(self.previous.line)));
 
-        if(self.match_token(TokenType::Else, source, scanner)) {
+        if self.match_token(TokenType::Else, source, scanner) {
             self.statement(source, chunk, scanner, heap);
         }
 

@@ -1,12 +1,6 @@
-var string_1 = "Hello";
-var string_2 = "World";
+var hi = 1;
 
-for (var i = 0; i < 3; i = i + 1) {
-    if (i == 0) {
-        print string_1;
-    } else if (i == 2) {
-        print string_2;
-    } else {
-        print "";
-    }
+for (var i = 1; i <= 5; i = i + 1) {
+    print hi;
+    hi = hi + 1;
 }

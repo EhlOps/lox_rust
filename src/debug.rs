@@ -1,13 +1,10 @@
 use crate::chunk::{
     Chunk, Op, Op::*, Line,
 };
-use crate::value::{
-    Value,
-    Value::*,
-};
+use crate::value::Value;
 use crate::object::Heap;
 
-pub fn dissassemble_chunk(chunk: &Chunk, heap: &mut Heap, name: &str) {
+pub fn _dissassemble_chunk(chunk: &Chunk, heap: &mut Heap, name: &str) {
     println!("== {} ==", name);
 
     let mut offset = 0;

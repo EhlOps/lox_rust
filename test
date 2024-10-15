@@ -1,0 +1,16 @@
+          
+0000 0001 OP_CONSTANT         1 'hi'                [ Obj(   "hi"   ) ]
+0001    | OP_DEFINE_GLOBAL    0 'hi'                
+0002 0003 OP_CONSTANT         2 '1'                 [ Number(   1.0    ) ]
+0003    | OP_GET_LOCAL         GetLocal(0)          [ Number(   1.0    ) ][ Number(   1.0    ) ]
+0004    | OP_CONSTANT         4 '200'               [ Number(   1.0    ) ][ Number(   1.0    ) ][ Number(  200.0   ) ]
+0005    | OP_GREATER                                [ Number(   1.0    ) ][  Bool(  false   )  ]
+0006    | OP_NOT                                    [ Number(   1.0    ) ][  Bool(   true   )  ]
+0007    | OP_JUMP_IF_FALSE JumpIfFalse(15) -> 10    [ Number(   1.0    ) ][  Bool(   true   )  ]
+0008    | OP_POP                                    [ Number(   1.0    ) ]
+0009    | OP_JUMP          Jump(6) -> 12            [ Number(   1.0    ) ]
+0016 0004 OP_GET_GLOBAL       8 'hi'                [ Number(   1.0    ) ][   Obj(   "hi"   )  ]
+0017    | OP_PRINT                                  [ Number(   1.0    ) ][   Obj(   "hi"   )  ]
+0018 0005 OP_GET_GLOBAL      10 'hi'                [ Number(   1.0    ) ][   Obj(   "hi"   )  ][   Obj(   "hi"   )  ]
+0019    | OP_CONSTANT        11 'hi'                [ Number(   1.0    ) ][   Obj(   "hi"   )  ][   Obj(   "hi"   )  ][  Obj(  " hi"   )  ]
+0020    | OP_ADD                                    [ Number(   1.0    ) ]

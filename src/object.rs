@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::chunk::Chunk;
 
 pub struct Heap {
     bytes_allocated: usize,
@@ -68,13 +69,61 @@ impl HeapVal {
 
 #[derive(Debug)]
 pub enum HeapData {
-    String(String)
+    String(String),
+    ObjFunction(ObjFunction),
+}
+
+#[derive(Debug)]
+pub struct ObjFunction {
+    pub arity: usize,
+    pub chunk: Chunk,
+    pub name: String,
+}
+
+impl ObjFunction {
+    pub fn new() -> ObjFunction {
+        ObjFunction {
+            arity: 0,
+            chunk: Chunk::new(),
+            name: String::new(),
+        }
+    }
+
+    pub fn with_name(name: String) -> ObjFunction {
+        ObjFunction {
+            arity: 0,
+            chunk: Chunk::new(),
+            name,
+        }
+    }
+
+    pub fn chunk(&self) -> &Chunk {
+        &self.chunk
+    }
+
+    pub fn chunk_mut(&mut self) -> &mut Chunk {
+        &mut self.chunk
+    }
+
+    pub fn set_chunk(&mut self, chunk: Chunk) {
+        self.chunk = chunk;
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
 }
 
 impl HeapData {
     pub fn as_string(&self) -> &String {
         if let HeapData::String(s) = self {
             s
+        } else if let HeapData::ObjFunction(f) = self {
+            &f.name
         } else {
             panic!("Expected string, got something else")
         }
